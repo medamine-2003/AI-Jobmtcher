@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Matching System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #3498db;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .options-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .option-item {
+            background: #e0e0e0;
+            padding: 8px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .option-item.selected {
+            background: #3498db;
+            color: white;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: #2ecc71;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #27ae60;
+        }
+        .results {
+            display: none;
+        }
+        .job-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .job-card h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .score {
+            font-weight: bold;
+            color: #e74c3c;
+        }
+        .missing-skills {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8d7da;
+            border-radius: 5px;
+            color: #721c24;
+        }
+        .no-skills {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .loading {
+            text-align: center;
+            display: none;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .suggestions {
+            margin-top: 30px;
+            padding: 20px;
+            background: #e8f4fc;
+            border-radius: 5px;
+        }
+        .suggestion-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .suggestion-item {
+            background: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            width: calc(33% - 20px);
+            min-width: 200px;
+        }
+        .suggestion-item.missing {
+            border-left: 4px solid #e74c3c;
+        }
+        .suggestion-item.related {
+            border-left: 4px solid #3498db;
+        }
+        .suggestion-type {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 3px;
+        }
+        .suggestion-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Job Matching System</h1>
+        
+        <div class="section">
+            <h2>Select Your Skills</h2>
+            <div class="options-container" id="skills-container"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Select Your Interests</h2>
+            <div class="options-container" id="interests-container"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Select Your Personality Traits</h2>
+            <div class="options-container" id="traits-container"></div>
+        </div>
+        
+        <button id="find-jobs">Find Matching Jobs</button>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Finding your best job matches...</p>
+        </div>
+        
+        <div class="results" id="results">
+            <h2>Your Top Job Matches</h2>
+            <div id="matches-container"></div>
+            
+            <div class="suggestions" id="suggestions-container">
+                <h2>Recommended Skills to Learn</h2>
+                <p>Based on your profile and job matches, consider learning these skills:</p>
+                <div class="suggestion-list" id="suggestions-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let options = {
+            skills: [],
+            interests: [],
+            traits: []
+        };
+        
+        let selected = {
+            skills: new Set(),
+            interests: new Set(),
+            traits: new Set()
+        };
+        
+        const skillsContainer = document.getElementById('skills-container');
+        const interestsContainer = document.getElementById('interests-container');
+        const traitsContainer = document.getElementById('traits-container');
+        const findJobsBtn = document.getElementById('find-jobs');
+        const loadingDiv = document.getElementById('loading');
+        const resultsDiv = document.getElementById('results');
+        const matchesContainer = document.getElementById('matches-container');
+        const suggestionsContainer = document.getElementById('suggestions-container');
+        const suggestionsList = document.getElementById('suggestions-list');
+        
+        async function fetchOptions() {
+            try {
+                const response = await fetch('/api/options');
+                const data = await response.json();
+                options = data;
+                renderOptions();
+            } catch (error) {
+                console.error('Error fetching options:', error);
+            }
+        }
+        
+        function renderOptions() {
+            renderOptionGroup(options.skills, skillsContainer, 'skills');
+            renderOptionGroup(options.interests, interestsContainer, 'interests');
+            renderOptionGroup(options.traits, traitsContainer, 'traits');
+        }
+        
+        function renderOptionGroup(items, container, type) {
+            container.innerHTML = '';
+            items.forEach(item => {
+                const option = document.createElement('div');
+                option.className = 'option-item';
+                if (selected[type].has(item.id)) {
+                    option.classList.add('selected');
+                }
+                option.textContent = item.name;
+                option.dataset.id = item.id;
+                option.addEventListener('click', () => toggleSelection(option, type, item.id));
+                container.appendChild(option);
+            });
+        }
+        
+        function toggleSelection(element, type, id) {
+            if (selected[type].has(id)) {
+                selected[type].delete(id);
+                element.classList.remove('selected');
+            } else {
+                selected[type].add(id);
+                element.classList.add('selected');
+            }
+        }
+        
+        async function findMatchingJobs() {
+            loadingDiv.style.display = 'block';
+            resultsDiv.style.display = 'none';
+            
+            try {
+                const requestData = {
+                    skills: Array.from(selected.skills),
+                    interests: Array.from(selected.interests),
+                    traits: Array.from(selected.traits)
+                };
+                
+                const response = await fetch('/api/matches', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                console.error('Error finding matches:', error);
+                matchesContainer.innerHTML = '<p>Error finding matches. Please try again.</p>';
+            } finally {
+                loadingDiv.style.display = 'none';
+                resultsDiv.style.display = 'block';
+            }
+        }
+        
+        function displayResults(data) {
+            matchesContainer.innerHTML = '';
+            
+            if (data.top_matches.length === 0) {
+                matchesContainer.innerHTML = '<p>No matches found. Try adjusting your selections.</p>';
+                suggestionsContainer.style.display = 'none';
+                return;
+            }
+            
+            data.top_matches.forEach(job => {
+                const jobCard = document.createElement('div');
+                jobCard.className = 'job-card';
+                
+                let html = `<h3>${job.title}</h3>`;
+                html += `<p>Match Score: <span class="score">${job.score.toFixed(1)}%</span></p>`;
+                
+                if (job.missing_skills.length > 0) {
+                    html += '<div class="missing-skills"><p>Missing Skills:</p><ul>';
+                    job.missing_skills.forEach(skill => {
+                        html += `<li>${skill.name}</li>`;
+                    });
+                    html += '</ul></div>';
+                } else if (job.has_required_skills) {
+                    html += '<p class="no-skills">You have all the required skills!</p>';
+                } else {
+                    html += '<p class="no-skills">No required skills for this job!</p>';
+                }
+                
+                jobCard.innerHTML = html;
+                matchesContainer.appendChild(jobCard);
+            });
+            
+            if (data.skill_suggestions && data.skill_suggestions.length > 0) {
+                suggestionsList.innerHTML = '';
+                
+                data.skill_suggestions.forEach(skill => {
+                    const item = document.createElement('div');
+                    item.className = `suggestion-item ${skill.type}`;
+                    
+                    let html = `<div class="suggestion-title">${skill.name}</div>`;
+                    html += `<div class="suggestion-type">${
+                        skill.type === 'missing_from_jobs' 
+                        ? 'Required for jobs you matched with' 
+                        : 'Related to your interests'
+                    }</div>`;
+                    
+                    item.innerHTML = html;
+                    suggestionsList.appendChild(item);
+                });
+                
+                suggestionsContainer.style.display = 'block';
+            } else {
+                suggestionsContainer.style.display = 'none';
+            }
+        }
+        
+        findJobsBtn.addEventListener('click', findMatchingJobs);
+        fetchOptions();
+    </script>
+</body>
+</html>
